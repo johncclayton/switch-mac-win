@@ -14,18 +14,30 @@ function Get-ScreenState {
     switch ((Get-Vcp 0x60 -TimeoutSec 3).Value) { 0x19 { 'Mac' } 0x0F { 'Windows' } default { 'Other' } }
 }
 
+# While the Mac is on screen, Windows often loses its DDC link to the monitor,
+# so "unreachable" is a state of its own. Unreachable -> Windows is the
+# Mac's "Go Windows!" and must move Deskflow back.
 Log 'watcher started'
 $last = $null
+$fails = 0
 while ($true) {
     try {
         $state = Get-ScreenState
-        if ($null -ne $last -and $state -ne $last -and $state -in 'Mac', 'Windows') {
+        $fails = 0
+    } catch {
+        $fails++
+        # Ignore short blips during mode changes; after ~5s call it unreachable.
+        $state = if ($fails -ge 2) { 'Unreachable' } else { $last }
+        if ($fails -eq 2) { Log "monitor unreachable: $($_.Exception.Message)" }
+    }
+    if ($null -ne $last -and $state -ne $last) {
+        if ($state -in 'Mac', 'Windows') {
             Log "screen changed $last -> $state; switching Deskflow"
             Switch-DeskflowScreen $state
+        } else {
+            Log "screen changed $last -> $state"
         }
-        $last = $state
-    } catch {
-        # Monitor briefly vanishes during mode changes; keep the last state and retry.
     }
+    $last = $state
     Start-Sleep -Milliseconds 1000
 }

@@ -53,24 +53,40 @@ function Invoke-WithRetry([scriptblock]$Action, [int]$TimeoutSec = 15) {
     }
 }
 
+# Runs $Action with a freshly enumerated monitor, then releases all handles.
+function Use-DdcMonitor([string]$Match, [scriptblock]$Action) {
+    $mons = [Ddc]::All()
+    try {
+        $m = $mons | Where-Object { $_.desc -like "*$Match*" } | Select-Object -First 1
+        if (-not $m) { throw "No DDC/CI monitor found matching '$Match'" }
+        & $Action $m
+    } finally {
+        foreach ($x in $mons) { [void][Ddc]::DestroyPhysicalMonitor($x.h) }
+    }
+}
+
 function Get-Vcp([byte]$Code, [string]$Match = '', [int]$TimeoutSec = 15) {
     Invoke-WithRetry -TimeoutSec $TimeoutSec {
-        $m = Get-DdcMonitor $Match
-        $cur = 0; $max = 0
-        $ok = [Ddc]::GetVCPFeatureAndVCPFeatureReply($m.h, $Code, [IntPtr]::Zero, [ref]$cur, [ref]$max)
-        if (-not $ok) { throw ('Reading VCP 0x{0:X2} failed' -f $Code) }
-        # Dell reports e.g. 0x0F0F for input 0x0F; the low byte is the value.
-        [pscustomobject]@{ Code = ('0x{0:X2}' -f $Code); Value = ($cur -band 0xFF); Raw = $cur; Max = $max }
+        Use-DdcMonitor $Match {
+            param($m)
+            $cur = 0; $max = 0
+            $ok = [Ddc]::GetVCPFeatureAndVCPFeatureReply($m.h, $Code, [IntPtr]::Zero, [ref]$cur, [ref]$max)
+            if (-not $ok) { throw ('Reading VCP 0x{0:X2} failed' -f $Code) }
+            # Dell reports e.g. 0x0F0F for input 0x0F; the low byte is the value.
+            [pscustomobject]@{ Code = ('0x{0:X2}' -f $Code); Value = ($cur -band 0xFF); Raw = $cur; Max = $max }
+        }
     }
 }
 
 function Set-Vcp([byte]$Code, [uint32]$Value, [string]$Match = '', [int]$TimeoutSec = 15) {
     Invoke-WithRetry -TimeoutSec $TimeoutSec {
-        $m = Get-DdcMonitor $Match
-        if (-not [Ddc]::SetVCPFeature($m.h, $Code, $Value)) { throw ('Setting VCP 0x{0:X2}={1} failed' -f $Code, $Value) }
+        Use-DdcMonitor $Match {
+            param($m)
+            if (-not [Ddc]::SetVCPFeature($m.h, $Code, $Value)) { throw ('Setting VCP 0x{0:X2}={1} failed' -f $Code, $Value) }
+        }
     }
 }
 
-function Get-DdcCapabilities([string]$Match = '') { [Ddc]::Caps((Get-DdcMonitor $Match).h) }
+function Get-DdcCapabilities([string]$Match = '') { Use-DdcMonitor $Match { param($m) [Ddc]::Caps($m.h) } }
 
 Export-ModuleMember -Function Get-DdcMonitor, Get-Vcp, Set-Vcp, Get-DdcCapabilities
