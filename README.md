@@ -52,8 +52,8 @@ script. Then check that the Windows PC can wake the Mac:
 powershell -ExecutionPolicy Bypass -File .\windows\test-wake.ps1
 ```
 
-**Defaults.** Deskflow screen names default to the short hostnames (e.g. `obsidian`, `m6`)
-and hosts to their Bonjour names (e.g. `obsidian.local`, `m6.local`), which resolve even
+**Defaults.** Deskflow screen names default to the short hostnames (e.g. `my-pc`, `my-mac`)
+and hosts to their Bonjour names (e.g. `my-pc.local`, `my-mac.local`), which resolve even
 while the Mac sleeps. If you give an IP address instead, reserve it in your router's DHCP
 settings.
 

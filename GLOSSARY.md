@@ -6,11 +6,11 @@ Switching one monitor, plus the keyboard and mouse shared through Deskflow, betw
 
 **Windows PC**:
 The computer with the keyboard and mouse plugged in. It runs the Deskflow server.
-_Avoid_: server, obsidian (a machine's name, not its role)
+_Avoid_: server, my-pc (a machine's name, not its role)
 
 **Mac**:
 The other computer, which gets its keyboard and mouse through Deskflow.
-_Avoid_: client, m6 (a machine's name, not its role)
+_Avoid_: client, my-mac (a machine's name, not its role)
 
 ## Identities
 
