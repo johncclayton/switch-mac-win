@@ -123,3 +123,31 @@ and restore Deskflow's settings from the `Deskflow.conf.bak-*` backups if you wa
   and the watcher switches the monitor back.
 - **The Windows PC can't control the monitor while the Mac is on screen:** there's no
   automatic fallback; use the monitor's input button.
+
+## When the Windows PC is asleep
+
+Nothing wakes the Windows PC over the network. This is a known limitation of the design.
+
+- **Why it's fine here:** the keyboard and mouse are plugged into the Windows PC, so a key
+  press always wakes it over USB, whatever its network connection. Deskflow then restarts and
+  the Mac reconnects. Keep the keyboard allowed to wake the PC; that's the Windows default
+  (Device Manager → the keyboard → Power Management).
+- **While it sleeps, the Mac has no shared keyboard or mouse,** because they go through the
+  Windows PC. Press a key on the shared keyboard to bring it back. Clicking **Go Windows!**
+  with the Mac's own trackpad switches the monitor, but the screen stays black until you
+  press a key.
+- **To avoid all this, don't let the Windows PC sleep** (Settings → System → Power → Sleep →
+  Never). It hosts the keyboard and the Deskflow server, so it's best treated as always on.
+
+**Why there's no Windows wake listener.** The Mac's wake listener works because of two Apple
+features: the Mac hands its listener to a Bonjour Sleep Proxy on the network (an Apple TV or
+HomePod) while it sleeps, and Macs can wake over Wi-Fi. Windows has neither:
+- It doesn't use a Bonjour Sleep Proxy, and in sleep (S3) every process is frozen, so a
+  listener can't hear anything.
+- Waking over the network needs Wake-on-LAN, which works on wired Ethernet when the adapter
+  and BIOS allow it. Over Wi-Fi it needs Wake-on-WLAN, which depends on the Wi-Fi card,
+  its driver and the BIOS, and is often unreliable.
+
+**So the Windows PC must be the Deskflow server.** The machine without the keyboard (the
+Deskflow client) is the one that must be woken over the network, and only the Mac can do that
+reliably, even on Wi-Fi. Running Windows as the client isn't supported.
