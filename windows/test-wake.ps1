@@ -10,4 +10,4 @@ Write-Host "$($cfg.clientHost) -> $ip"
 if (-not (Send-MacWake)) { Write-Host "Couldn't connect to the wake listener on $($ip):$($cfg.wakePort). Is mac/install.sh done?" -ForegroundColor Red; exit 1 }
 Write-Host "Sent the wake token to $($ip):$($cfg.wakePort)."
 if (Resume-Mac -WaitSec 10) { Write-Host 'The Mac connected to Deskflow.' -ForegroundColor Green }
-else { Write-Host "No new Deskflow connection. That's expected if the Mac was already awake; otherwise check the Mac's log: log show --last 5m --predicate 'eventMessage CONTAINS \"switch-mac-win\"'" -ForegroundColor Yellow }
+else { Write-Host "No new Deskflow connection. That's expected if the Mac was already awake; otherwise check ~/Library/Logs/switch-mac-win-wake.log on the Mac." -ForegroundColor Yellow }

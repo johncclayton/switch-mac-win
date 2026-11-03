@@ -4,7 +4,8 @@
 # At most one wake every 2 seconds.
 config="$HOME/Library/Application Support/switch-mac-win/config"
 stamp="$HOME/Library/Caches/switch-mac-win/last-wake"
-say() { logger -t switch-mac-win "wake: $*"; }
+log="$HOME/Library/Logs/switch-mac-win-wake.log"
+say() { echo "$(date '+%Y-%m-%dT%H:%M:%S') $*" >> "$log"; }
 
 [ -r "$config" ] || { say "no config at $config"; exit 0; }
 # shellcheck source=/dev/null
@@ -20,7 +21,7 @@ fi
 mkdir -p "$(dirname "$stamp")"
 now=$(date +%s)
 last=$(cat "$stamp" 2>/dev/null || echo 0)
-if [ $((now - last)) -lt 2 ]; then exit 0; fi
+if [ $((now - last)) -lt 2 ]; then say "ignored: less than 2 s since the last wake"; exit 0; fi
 echo "$now" > "$stamp"
 
 say "waking"

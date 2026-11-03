@@ -125,6 +125,7 @@ df_conf="$HOME/Library/Deskflow/Deskflow.conf"
 osascript -e 'quit app "Deskflow"' 2>/dev/null || true
 sleep 2
 pkill -x Deskflow 2>/dev/null || true
+pkill -x deskflow-core 2>/dev/null || true   # the core can outlive the app, with the old settings
 mkdir -p "$(dirname "$df_conf")"
 if [ -f "$df_conf" ]; then cp "$df_conf" "$df_conf.bak-$(date +%Y%m%d-%H%M%S)"; else : > "$df_conf"; fi
 set_ini "$df_conf" core computerName "$CLIENT_NAME"

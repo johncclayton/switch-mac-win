@@ -108,8 +108,8 @@ and restore Deskflow's settings from the `Deskflow.conf.bak-*` backups if you wa
   advertised over Bonjour. A connection wakes a sleeping Mac, but only partly (a "dark wake":
   screen off, Deskflow disconnected), so for each connection launchd runs `mac/wake.sh`. It
   reads the wake token the Windows PC sends, and if it matches runs `caffeinate -u`, which
-  fully wakes the Mac. It allows at most one wake every 2 seconds and logs to the system log
-  (`log show --last 10m --predicate 'eventMessage CONTAINS "switch-mac-win"'`).
+  fully wakes the Mac. It allows at most one wake every 2 seconds and logs to
+  `~/Library/Logs/switch-mac-win-wake.log`.
   There's no SSH anywhere ([ADR 0001](docs/adr/0001-no-ssh-wake-via-launchd.md)).
 
 ## When the Mac isn't there
