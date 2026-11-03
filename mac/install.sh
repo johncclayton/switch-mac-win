@@ -11,3 +11,11 @@ for app in "$HOME/Desktop/Go Windows!.app" "$HOME/Applications/Go Windows!.app";
     osacompile -o "$app" -e "do shell script quoted form of \"$here/switch-to-windows.sh\""
     echo "Created $app"
 done
+
+# Wake listener: lets Windows wake this Mac by connecting to TCP port 47999 (no SSH needed).
+agent="$HOME/Library/LaunchAgents/com.switch-mac-win.wake.plist"
+mkdir -p "$HOME/Library/LaunchAgents"
+launchctl bootout "gui/$(id -u)" "$agent" 2>/dev/null || true
+cp "$here/wake-listener.plist" "$agent"
+launchctl bootstrap "gui/$(id -u)" "$agent"
+echo "Wake listener on port 47999 ($agent)"
