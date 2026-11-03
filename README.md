@@ -2,14 +2,82 @@
 
 One-click switching of a **Dell U4021QW** between a Mac (Thunderbolt) and a Windows
 PC (DisplayPort), with [Deskflow](https://github.com/deskflow/deskflow) moving the
-keyboard/mouse to match. Windows (`obsidian`) is the Deskflow server and the Mac
-(`m6.local`) is the client.
+keyboard and mouse to match. The Windows PC is the Deskflow server and the Mac is the
+client. Terms are defined in [GLOSSARY.md](GLOSSARY.md); decisions are recorded in [docs/adr](docs/adr).
 
 | Shortcut | Where | Does |
 |---|---|---|
-| **Go Mac!** | Windows desktop | PBP off, input → Thunderbolt, Deskflow → Mac |
-| **Go Windows!** | Mac desktop (and Windows) | PBP off, input → DisplayPort, Deskflow → Windows |
+| **Go Mac!** | Windows desktop | Wakes the Mac if needed, Deskflow → Mac, PBP off, input → Thunderbolt |
+| **Go Windows!** | Mac (Desktop, `~/Applications`) and Windows desktop | PBP off, input → DisplayPort, Deskflow → Windows |
 | **Go Split!** | Windows desktop | PBP 50/50: Windows left, Mac right |
+| **Ctrl+Alt+Shift+F11** | either machine | Toggles between the two machines (the monitor follows) |
+
+## Setup
+
+You need:
+- A Dell U4021QW with **DDC/CI enabled** (on-screen menu → Others → DDC/CI → On). The
+  Windows PC is on **DisplayPort**, the Mac on **Thunderbolt/USB-C**, and the keyboard and
+  mouse are plugged into the Windows PC.
+- **[Deskflow](https://github.com/deskflow/deskflow)** (tested with 1.27) on both machines.
+  On Windows, install it with its background service: the scripts read
+  `C:\ProgramData\Deskflow\deskflow-daemon.log`. On the Mac, set it to start at login and
+  give it **Accessibility** permission (System Settings → Privacy & Security). Deskflow's own
+  settings can be left as they are: the installers set the screen names and the server address.
+- **Homebrew** on the Mac (Apple silicon, `/opt/homebrew`).
+- This repo cloned on both machines.
+
+Then run the installer on either machine first. It asks for each machine's
+**Deskflow screen name** and **host or IP address**, and finishes by printing the exact
+command to run on the other machine, with the wake token and every value filled in.
+
+Windows PC:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\install.ps1 --server
+```
+
+Mac:
+
+```sh
+./mac/install.sh --client
+```
+
+The installers are safe to re-run: the current config is used as the defaults, and the
+wake token is kept unless you pass `--new-token`. Each takes its values as options too
+(`--server-name`, `--server-host`, `--client-name`, `--client-host`, `--token`,
+`--wake-port`, and `--yes` to skip the questions); see the comments at the top of each
+script. Then check that the Windows PC can wake the Mac:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\windows\test-wake.ps1
+```
+
+**Defaults.** Deskflow screen names default to the short hostnames (e.g. `obsidian`, `m6`)
+and hosts to their Bonjour names (e.g. `obsidian.local`, `m6.local`), which resolve even
+while the Mac sleeps. If you give an IP address instead, reserve it in your router's DHCP
+settings.
+
+**What the installers change.**
+- **Windows PC:** `%LOCALAPPDATA%\switch-mac-win\config.json`; Deskflow's settings
+  (`%APPDATA%\Deskflow\Deskflow.conf`, backed up first) and its server config
+  `C:\ProgramData\Deskflow\switch-mac-win.conf`, generated from
+  `deskflow/deskflow-server.conf.template`; the **Go Mac!**, **Go Windows!** and
+  **Go Split!** desktop shortcuts; and the watcher, started now and from the Startup folder.
+- **Mac:** `~/Library/Application Support/switch-mac-win/config`; Deskflow's settings
+  (`~/Library/Deskflow/Deskflow.conf`, backed up first); `m1ddc`; the **Go Windows!** app; and
+  the wake listener `~/Library/LaunchAgents/com.switch-mac-win.wake.plist`.
+
+The config is the source of truth: the installers overwrite the screen names and the server
+address in Deskflow's settings ([ADR 0002](docs/adr/0002-our-config-overwrites-deskflow-settings.md)).
+To change them, re-run the installers, not the Deskflow app.
+
+**Hotkeys** are in `config.json` on the Windows PC (`toggleKey`, `toMacKey`, `toWindowsKey`,
+in Deskflow syntax, e.g. `Control+Alt+Shift+F11`). Edit them there, or pass `--toggle-key`,
+`--to-mac-key` and `--to-windows-key`, then re-run `install.ps1`.
+
+**Uninstalling.** There's no uninstaller. Delete the files listed above, unload the Mac's
+LaunchAgent with `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.switch-mac-win.wake.plist`,
+and restore Deskflow's settings from the `Deskflow.conf.bak-*` backups if you want them back.
 
 ## How it works
 
@@ -17,10 +85,16 @@ keyboard/mouse to match. Windows (`obsidian`) is the Deskflow server and the Mac
   no extra tools). On the Mac it's [`m1ddc`](https://github.com/waydabber/m1ddc).
   U4021QW codes: input `0x60` (DP = `0x0F`, TB = `0x19`), PBP mode `0xE9`
   (`0x00` off, `0x24` split), PBP second input `0xE8`.
-- **Deskflow:** `deskflow/deskflow-server.conf` has **no screen links**, so you
-  switch explicitly. **Ctrl+Alt+Shift+F11** toggles between the two machines, on either
-  machine. The scripts and the watcher use explicit hotkeys instead: **Ctrl+Alt+Shift+F10** (→ Mac)
-  and **Ctrl+Alt+Shift+F12** (→ Windows).
+- **Deskflow:** the server config has **no screen links**, so the cursor never wanders onto a
+  machine the monitor isn't showing. Three hotkeys switch explicitly:
+
+  | Default hotkey | Action | Used by |
+  |---|---|---|
+  | Ctrl+Alt+Shift+F11 | toggle | you, on either machine |
+  | Ctrl+Alt+Shift+F10 | go to the Mac | Go Mac!, the watcher |
+  | Ctrl+Alt+Shift+F12 | go to the Windows PC | Go Windows!, the watcher |
+
+  The keyboard is plugged into the Windows PC, so the hotkeys work whichever machine you're on.
 - **Watcher:** `windows/watch-monitor.ps1` runs at logon and keeps the monitor and Deskflow
   in step, whichever one moves first. It logs to `%LOCALAPPDATA%\switch-mac-win\watch.log`.
   - *Monitor → Deskflow:* it polls the monitor once a second. When the monitor goes fullscreen
@@ -29,92 +103,23 @@ keyboard/mouse to match. Windows (`obsidian`) is the Deskflow server and the Mac
     It also works if you switch inputs with the monitor's buttons.
   - *Deskflow → monitor:* it reads Deskflow's log, and when the cursor changes machine (e.g. via
     the hotkeys) it switches the monitor to match. In split view it leaves the monitor alone,
-    so the hotkeys just move the cursor. If Windows can't reach the monitor over DDC, it asks
-    the Mac over `ssh m6` to run `mac/switch-to-windows.sh`.
+    so the hotkeys just move the cursor.
+- **Wake listener:** a LaunchAgent on the Mac in which launchd listens on TCP port 47999,
+  advertised over Bonjour. A connection wakes a sleeping Mac, but only partly (a "dark wake":
+  screen off, Deskflow disconnected), so for each connection launchd runs `mac/wake.sh`. It
+  reads the wake token the Windows PC sends, and if it matches runs `caffeinate -u`, which
+  fully wakes the Mac. It allows at most one wake every 2 seconds and logs to the system log
+  (`log show --last 10m --predicate 'eventMessage CONTAINS "switch-mac-win"'`).
+  There's no SSH anywhere ([ADR 0001](docs/adr/0001-no-ssh-wake-via-launchd.md)).
 
 ## When the Mac isn't there
 
-- **Asleep:** **Go Mac!** and **F11** wake it, wait for Deskflow to reconnect, then switch.
-  A bare network packet only half-wakes a Mac (a "dark wake", with Deskflow still disconnected),
-  so the Mac must also run `caffeinate -u`. They try two ways, in order:
-  1. **Wake listener** *(experimental, no SSH)*: `mac/wake-listener.plist` is a LaunchAgent in
-     which launchd listens on TCP port **47999**, advertised over Bonjour so a connection wakes the
-     Mac, and runs `caffeinate -u` for each connection. Windows just connects to it. In testing
-     this woke a sleeping Mac in about 2 seconds. It has no authentication or rate limiting yet.
-  2. **SSH:** `ssh m6 caffeinate -u`, taking about 6 to 7 seconds in total.
-- **Off, or Deskflow not running:** Go Mac! moves Deskflow first and only switches the
-  monitor once Deskflow confirms the move, so it shows a warning and stays on Windows. F11 does nothing.
-- If the Mac drops out while you're on it, Deskflow jumps the cursor back to Windows and the
-  watcher switches the monitor back.
-
-## Requirements
-
-Everything below must be in place; the install scripts only cover the parts marked *(installer)*.
-
-**Monitor**
-- Dell U4021QW with **DDC/CI enabled** (on-screen menu → Others → DDC/CI → On).
-- Windows on **DisplayPort**, Mac on **Thunderbolt/USB-C**. The keyboard and mouse are plugged into Windows.
-
-**Deskflow** (tested with 1.27) on both machines
-- Windows is the **server**, installed with its background service (the scripts read
-  `C:\ProgramData\Deskflow\deskflow-daemon.log`). The Mac (`m6.local`) is added as a
-  computer in the server's GUI. Per-screen options such as the Mac's Ctrl/Cmd remapping live
-  there, not in the text config.
-- Server config: `deskflow/deskflow-server.conf`, which defines the hotkeys *(installer)*:
-
-  | Hotkey | Action | Used by |
-  |---|---|---|
-  | Ctrl+Alt+Shift+F11 | `switchToNextScreen` (toggle) | you, on either machine |
-  | Ctrl+Alt+Shift+F10 | `switchToScreen(m6.local)` | Go Mac!, the watcher |
-  | Ctrl+Alt+Shift+F12 | `switchToScreen(obsidian)` | Go Windows!, the watcher |
-
-- The Mac is a **client** connecting to `obsidian`, with Deskflow set to start at login and
-  granted **Accessibility** permission (System Settings → Privacy & Security).
-
-**SSH from Windows to the Mac** (a fallback for waking it and for switching the monitor; the wake listener may make it optional)
-- On the Mac: **Remote Login** on (System Settings → General → Sharing).
-- On Windows: the built-in OpenSSH client, and a host alias `m6` in `~/.ssh/config` that logs
-  in **with a key and no password prompt**. The scripts use `ssh -o BatchMode=yes m6`. Example:
-
-  ```
-  Host m6
-      HostName m6.local          # or the Mac's IP
-      User your-mac-username
-      IdentityFile ~/.ssh/id_ed25519
-  ```
-
-  Check it with `ssh -o BatchMode=yes m6 true`.
-
-**Mac tools:** Homebrew on Apple silicon (`/opt/homebrew`), plus `m1ddc` *(installer)*.
-
-**Names baked in.** If a machine is renamed, update these:
-- `obsidian` and `m6.local` (Deskflow screen names): `deskflow/deskflow-server.conf`,
-  `windows/Deskflow.psm1`, `windows/watch-monitor.ps1`.
-- `m6` (SSH alias): `windows/Deskflow.psm1`, `windows/watch-monitor.ps1`.
-- `~/src/switch-mac-win` (repo path on the Mac): `windows/watch-monitor.ps1`.
-
-## Setup
-
-Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\windows\install.ps1
-```
-
-This backs up `%APPDATA%\Deskflow\Deskflow.conf`, points Deskflow at the text config
-(copied to `C:\ProgramData\Deskflow\switch-mac-win.conf`), creates the desktop shortcuts,
-and starts the watcher (it also adds it to Startup). Re-run it after editing
-`deskflow-server.conf`: it restarts the Deskflow app, because that is the only time Deskflow
-re-reads the config.
-
-Mac:
-
-Clone the repo to `~/src/switch-mac-win` (the watcher's SSH fallback expects it there). Then:
-
-```sh
-./mac/install.sh
-```
-
-This installs `m1ddc` and the wake listener (port 47999), and creates **Go Windows!** in `~/Desktop` and `~/Applications`
-(find it with Spotlight, or drag it to the Dock). From the Mac you can also just press
-**Ctrl+Alt+Shift+F11**: the keyboard is plugged into Windows, so the Deskflow hotkey works anywhere.
+- **Asleep:** **Go Mac!** and the toggle hotkey wake it through the wake listener, wait for
+  Deskflow to reconnect (about 2 s), then switch.
+- **Off, or Deskflow or the wake listener not running:** Go Mac! moves Deskflow first and only
+  switches the monitor once Deskflow confirms the move, so it shows a warning and stays on
+  Windows. The toggle hotkey does nothing.
+- **The Mac drops out while you're on it:** Deskflow jumps the cursor back to the Windows PC,
+  and the watcher switches the monitor back.
+- **The Windows PC can't control the monitor while the Mac is on screen:** there's no
+  automatic fallback; use the monitor's input button.

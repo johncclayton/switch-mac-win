@@ -1,0 +1,8 @@
+# switch-mac-win config for the Mac, written by mac/install.sh to
+# ~/Library/Application Support/switch-mac-win/config. Shell syntax (it's sourced).
+SERVER_NAME='obsidian'          # Deskflow screen name of the Windows PC
+SERVER_HOST='obsidian.local'    # host or IP address of the Windows PC
+CLIENT_NAME='m6'                # Deskflow screen name of this Mac
+CLIENT_HOST='m6.local'          # host or IP address of this Mac
+WAKE_PORT='47999'
+WAKE_TOKEN='generated-by-the-installer'

@@ -1,0 +1,11 @@
+{
+    "serverName": "obsidian",
+    "serverHost": "obsidian.local",
+    "clientName": "m6",
+    "clientHost": "m6.local",
+    "wakePort": 47999,
+    "wakeToken": "generated-by-the-installer",
+    "toggleKey": "Control+Alt+Shift+F11",
+    "toMacKey": "Control+Alt+Shift+F10",
+    "toWindowsKey": "Control+Alt+Shift+F12"
+}

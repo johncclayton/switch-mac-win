@@ -30,11 +30,11 @@ function Set-Fullscreen([int]$InputCode) {
 switch ($Target) {
     'Mac' {
         # Move the keyboard/mouse first. If the Mac isn't connected to Deskflow (e.g.
-        # asleep), wake it over ssh and try again; if that fails too, leave the monitor
+        # asleep), wake it and try again; if that fails too, leave the monitor
         # on Windows rather than switching to a blank screen.
         if (-not $NoDeskflow -and -not (Switch-DeskflowScreen Mac -WaitSec 2) -and
             -not ((Resume-Mac) -and (Switch-DeskflowScreen Mac -WaitSec 3))) {
-            $msg = "Couldn't reach the Mac: it didn't wake up or Deskflow isn't running on it. Staying on Windows."
+            $msg = "Couldn't reach the Mac: it didn't wake up, or Deskflow or the wake listener isn't running on it. Staying on Windows."
             (New-Object -ComObject WScript.Shell).Popup($msg, 8, 'Go Mac!', 0x30) | Out-Null
             exit 1
         }

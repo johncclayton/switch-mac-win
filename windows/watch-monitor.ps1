@@ -2,17 +2,15 @@
 #  - monitor -> Deskflow: polls the monitor; when it goes fullscreen DP/Thunderbolt
 #    (e.g. "Go Windows!" on the Mac, or the monitor's buttons) it moves the cursor.
 #  - Deskflow -> monitor: reads Deskflow's log; when the cursor changes machine
-#    (e.g. the Ctrl+Alt+Shift+F11 toggle hotkey) it switches the monitor to match.
-#    In split view the monitor is left alone, so the hotkeys just move the cursor.
+#    (e.g. the toggle hotkey) it switches the monitor to match. In split view the
+#    monitor is left alone, so the hotkeys just move the cursor.
+#  - toggle hotkey while the Mac sleeps: wakes the Mac, then moves there.
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'DellDdc.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'Deskflow.psm1') -Force
 
 $switchDisplay = Join-Path $PSScriptRoot 'Switch-Display.ps1'
 $deskflowLog = 'C:\ProgramData\Deskflow\deskflow-daemon.log'
-$screenOf = @{ 'm6.local' = 'Mac'; 'obsidian' = 'Windows' }
-$macHost = 'm6'   # ssh fallback when Windows can't reach the monitor over DDC
-$macSwitchToWindows = '~/src/switch-mac-win/mac/switch-to-windows.sh'
 
 $log = Join-Path $env:LOCALAPPDATA 'switch-mac-win\watch.log'
 New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
@@ -24,8 +22,8 @@ function Get-ScreenState {
     switch ((Get-Vcp 0x60 -TimeoutSec 3).Value) { 0x19 { 'Mac' } 0x0F { 'Windows' } default { 'Other' } }
 }
 
-# Returns the machines Deskflow switched to since the last call, in order, plus
-# 'wake-mac' when the F11 toggle failed because the Mac wasn't connected.
+# Returns the Deskflow screen names Deskflow switched to since the last call, in
+# order, plus 'wake-mac' when the toggle hotkey failed because the Mac wasn't connected.
 $logPos = try { (Get-Item $deskflowLog).Length } catch { 0 }
 function Read-DeskflowSwitches {
     $fs = [IO.File]::Open($deskflowLog, 'Open', 'Read', 'ReadWrite,Delete')
@@ -53,10 +51,8 @@ function Sync-MonitorTo($target) {
     try {
         & $switchDisplay -Target $target -NoDeskflow -TimeoutSec 4
     } catch {
-        if ($target -ne 'Windows') { Log "monitor switch failed: $($_.Exception.Message)"; return $now }
-        Log "DDC from Windows failed ($($_.Exception.Message)); asking the Mac via ssh"
-        & ssh.exe -o BatchMode=yes -o ConnectTimeout=5 $macHost $macSwitchToWindows 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { Log "ssh fallback failed (exit $LASTEXITCODE)"; return $now }
+        # No fallback (see docs/adr/0001): use the monitor's input button.
+        Log "monitor switch failed: $($_.Exception.Message)"; return $now
     }
     return $target
 }
@@ -90,16 +86,15 @@ while ($true) {
     try {
         $moves = @(Read-DeskflowSwitches)
         if ($moves -contains 'wake-mac') {
-            # F11 pressed while the Mac was asleep: wake it, then go there. The
+            # Toggle pressed while the Mac was asleep: wake it, then go there. The
             # resulting Deskflow switch is picked up next time round and moves the monitor.
-            Log 'F11 but the Mac is not connected; waking it'
-            $how = Resume-Mac
-            if ($how -and (Switch-DeskflowScreen Mac -WaitSec 3)) { Log "Mac woke up (via $how)" }
+            Log 'toggle hotkey but the Mac is not connected; waking it'
+            if ((Resume-Mac) -and (Switch-DeskflowScreen Mac -WaitSec 3)) { Log 'Mac woke up' }
             else { Log 'Mac did not wake up / reconnect; staying on Windows' }
             $moves = @()
         }
         if ($moves.Count) {
-            $target = $screenOf[$moves[-1]]
+            $target = Get-ScreenRole $moves[-1]
             if ($target) { $last = Sync-MonitorTo $target }
         }
     } catch { Log "deskflow log check failed: $($_.Exception.Message)" }

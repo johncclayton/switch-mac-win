@@ -1,6 +1,9 @@
-# Moves the Deskflow cursor by "pressing" the hotkeys defined in
-# deskflow/deskflow-server.conf. The Deskflow server hooks the keyboard globally,
-# so synthesized keys reach it even when the cursor is on the Mac.
+# Moves the Deskflow cursor by "pressing" the hotkeys from the config (written into
+# Deskflow's server config by install.ps1), and wakes a sleeping Mac.
+# The Deskflow server hooks the keyboard globally, so synthesized keys reach it even
+# when the cursor is on the Mac.
+Import-Module (Join-Path $PSScriptRoot 'Config.psm1')
+
 $src = @'
 using System; using System.Runtime.InteropServices;
 public static class DfKeys {
@@ -17,16 +20,15 @@ public static class DfKeys {
 '@
 if (-not ('DfKeys' -as [type])) { Add-Type -TypeDefinition $src }
 
-$VK_CONTROL = 0x11; $VK_MENU = 0x12; $VK_SHIFT = 0x10; $VK_F10 = 0x79; $VK_F12 = 0x7B
+$DeskflowLog = 'C:\ProgramData\Deskflow\deskflow-daemon.log'
+$Config = Read-SmwConfig
 
-# Mac = Ctrl+Alt+Shift+F10 -> switchToScreen(m6.local)
-# (F11 is the toggle for people; scripts need an explicit target)
-# Windows = Ctrl+Alt+Shift+F12 -> switchToScreen(obsidian)
-$deskflowLog = 'C:\ProgramData\Deskflow\deskflow-daemon.log'
-$screenName = @{ Mac = 'm6.local'; Windows = 'obsidian' }
-$macHost = 'm6'   # ssh host used to wake the Mac
+# Deskflow screen name -> 'Mac' / 'Windows'
+function Get-ScreenRole([string]$ScreenName) {
+    if ($ScreenName -eq $Config.clientName) { 'Mac' } elseif ($ScreenName -eq $Config.serverName) { 'Windows' }
+}
 
-function Get-DeskflowLogLength { try { (Get-Item $deskflowLog).Length } catch { 0 } }
+function Get-DeskflowLogLength { try { (Get-Item $DeskflowLog).Length } catch { 0 } }
 
 # Waits until Deskflow logs a line matching $Pattern after byte offset $From.
 function Wait-DeskflowLog([string]$Pattern, [long]$From, [int]$WaitSec) {
@@ -34,7 +36,7 @@ function Wait-DeskflowLog([string]$Pattern, [long]$From, [int]$WaitSec) {
     do {
         Start-Sleep -Milliseconds 200
         try {
-            $fs = [IO.File]::Open($deskflowLog, 'Open', 'Read', 'ReadWrite,Delete')
+            $fs = [IO.File]::Open($DeskflowLog, 'Open', 'Read', 'ReadWrite,Delete')
             try {
                 if ($fs.Length -lt $From) { $From = 0 }   # log was rotated
                 $fs.Position = $From
@@ -45,58 +47,46 @@ function Wait-DeskflowLog([string]$Pattern, [long]$From, [int]$WaitSec) {
     $false
 }
 
-# With -WaitSec, waits for Deskflow to log the move and returns whether it happened
-# (it doesn't when the Mac's Deskflow isn't connected).
+# Presses the "go to Mac" / "go to Windows" hotkey. With -WaitSec, waits for Deskflow
+# to log the move and returns whether it happened (it doesn't when the Mac's Deskflow
+# isn't connected).
 function Switch-DeskflowScreen([ValidateSet('Mac', 'Windows')][string]$Screen, [int]$WaitSec = 0) {
     $start = Get-DeskflowLogLength
-    $fkey = if ($Screen -eq 'Mac') { $VK_F10 } else { $VK_F12 }
-    [DfKeys]::Chord([byte[]]@($VK_CONTROL, $VK_MENU, $VK_SHIFT, $fkey))
+    $keystroke = if ($Screen -eq 'Mac') { $Config.toMacKey } else { $Config.toWindowsKey }
+    [DfKeys]::Chord([byte[]]@(ConvertTo-VirtualKeys $keystroke))
     if (-not $WaitSec) { return }
-    Wait-DeskflowLog ('(?:switch|jump) from "[^"]+" to "' + [regex]::Escape($screenName[$Screen]) + '"') $start $WaitSec
+    $name = if ($Screen -eq 'Mac') { $Config.clientName } else { $Config.serverName }
+    Wait-DeskflowLog ('(?:switch|jump) from "[^"]+" to "' + [regex]::Escape($name) + '"') $start $WaitSec
 }
 
-$macWakePort = 47999   # mac/wake-listener.plist
-
-# Windows often can't resolve m6.local, so fall back to the HostName in ~/.ssh/config.
-function Get-MacAddress {
-    try { return ([Net.Dns]::GetHostAddresses('m6.local') | Where-Object AddressFamily -eq 'InterNetwork' | Select-Object -First 1).IPAddressToString } catch {}
-    $cfg = Join-Path $env:USERPROFILE '.ssh\config'
-    if (Test-Path $cfg) {
-        $inHost = $false
-        foreach ($line in Get-Content $cfg) {
-            if ($line -match '^\s*Host\s+(.+)$') { $inHost = ($Matches[1] -split '\s+') -contains $macHost }
-            elseif ($inHost -and $line -match '^\s*HostName\s+(\S+)') { return $Matches[1] }
-        }
-    }
-    'm6.local'
-}
-
-# Pokes the Mac's wake listener (mac/wake-listener.plist): connecting is all it takes.
-function Send-MacWakeConnection([int]$TimeoutMs = 3000) {
+# Connects to the Mac's wake listener and sends the wake token.
+function Send-MacWake([int]$TimeoutMs = 3000) {
+    $ip = Resolve-IPv4 $Config.clientHost
+    if (-not $ip) { return $false }
     $c = New-Object Net.Sockets.TcpClient
-    try { $c.ConnectAsync((Get-MacAddress), $macWakePort).Wait($TimeoutMs) } catch { $false } finally { $c.Close() }
+    try {
+        if (-not $c.ConnectAsync([Net.IPAddress]::Parse($ip), [int]$Config.wakePort).Wait($TimeoutMs)) { return $false }
+        $w = New-Object IO.StreamWriter($c.GetStream())
+        $w.Write("$($Config.wakeToken)`n"); $w.Flush()
+        $true
+    } catch { $false } finally { $c.Close() }
 }
 
-# Wakes a sleeping Mac and waits for its Deskflow client to reconnect. Returns how it
-# woke ('listener' or 'ssh'), or $null. A plain network packet only "dark wakes" the
-# Mac (screen off, Deskflow stays disconnected); caffeinate -u, run either by the wake
-# listener or over ssh, declares user activity, which fully wakes it.
-function Resume-Mac([int]$WaitSec = 15, [ValidateSet('Auto', 'Listener', 'Ssh')][string]$Method = 'Auto') {
-    if ($Method -in 'Auto', 'Listener') {
-        $start = Get-DeskflowLogLength
-        # The first connection may only wake the Mac; retry so one lands once it's up.
-        $deadline = (Get-Date).AddSeconds($WaitSec)
-        do {
-            [void](Send-MacWakeConnection)
-            if (Wait-DeskflowLog 'accepted client connection' $start 2) { Start-Sleep -Milliseconds 500; return 'listener' }
-        } while ((Get-Date) -lt $deadline)
-        if ($Method -eq 'Listener') { return $null }
-    }
+# Wakes a sleeping Mac and waits for its Deskflow client to reconnect. A network
+# packet alone only "dark wakes" the Mac (screen off, Deskflow disconnected); the wake
+# listener runs caffeinate -u, which fully wakes it. Returns whether Deskflow reconnected.
+function Resume-Mac([int]$WaitSec = 15) {
     $start = Get-DeskflowLogLength
-    & ssh.exe -o BatchMode=yes -o ConnectTimeout=8 $macHost 'caffeinate -u -t 2' 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { return $null }
-    if (Wait-DeskflowLog 'accepted client connection' $start $WaitSec) { Start-Sleep -Milliseconds 500; return 'ssh' }
-    $null
+    $deadline = (Get-Date).AddSeconds($WaitSec)
+    do {
+        # The first connection may only wake the Mac; retry so one lands once it's up.
+        [void](Send-MacWake)
+        if (Wait-DeskflowLog 'accepted client connection' $start 2) {
+            Start-Sleep -Milliseconds 500   # let the handshake finish
+            return $true
+        }
+    } while ((Get-Date) -lt $deadline)
+    $false
 }
 
-Export-ModuleMember -Function Switch-DeskflowScreen, Resume-Mac
+Export-ModuleMember -Function Switch-DeskflowScreen, Resume-Mac, Get-ScreenRole, Send-MacWake
