@@ -59,9 +59,21 @@ function Switch-DeskflowScreen([ValidateSet('Mac', 'Windows')][string]$Screen, [
     Wait-DeskflowLog ('(?:switch|jump) from "[^"]+" to "' + [regex]::Escape($name) + '"') $start $WaitSec
 }
 
+# The Mac's IPv4 address. Resolving a .local name while the Mac sleeps works only
+# some of the time, so remember the last good answer and fall back to it.
+function Get-MacIPv4 {
+    $cache = Join-Path (Split-Path $ConfigPath) 'mac-ipv4.txt'
+    $ip = Resolve-IPv4 $Config.clientHost
+    if ($ip) {
+        try { if ((Get-Content $cache -ErrorAction SilentlyContinue) -ne $ip) { Set-Content $cache $ip } } catch {}
+        return $ip
+    }
+    try { (Get-Content $cache -ErrorAction Stop | Select-Object -First 1) } catch { $null }
+}
+
 # Connects to the Mac's wake listener and sends the wake token.
 function Send-MacWake([int]$TimeoutMs = 3000) {
-    $ip = Resolve-IPv4 $Config.clientHost
+    $ip = Get-MacIPv4
     if (-not $ip) { return $false }
     $c = New-Object Net.Sockets.TcpClient
     try {
@@ -89,4 +101,4 @@ function Resume-Mac([int]$WaitSec = 15) {
     $false
 }
 
-Export-ModuleMember -Function Switch-DeskflowScreen, Resume-Mac, Get-ScreenRole, Send-MacWake
+Export-ModuleMember -Function Switch-DeskflowScreen, Resume-Mac, Get-ScreenRole, Send-MacWake, Get-MacIPv4

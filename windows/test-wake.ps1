@@ -4,8 +4,8 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'Config.psm1')
 Import-Module (Join-Path $PSScriptRoot 'Deskflow.psm1')
 $cfg = Read-SmwConfig
-$ip = Resolve-IPv4 $cfg.clientHost
-if (-not $ip) { Write-Host "Can't resolve $($cfg.clientHost) to an IPv4 address." -ForegroundColor Red; exit 1 }
+$ip = Get-MacIPv4
+if (-not $ip) { Write-Host "Can't resolve $($cfg.clientHost) to an IPv4 address, and there's no earlier answer to fall back on. Try again while the Mac is awake." -ForegroundColor Red; exit 1 }
 Write-Host "$($cfg.clientHost) -> $ip"
 if (-not (Send-MacWake)) { Write-Host "Couldn't connect to the wake listener on $($ip):$($cfg.wakePort). Is mac/install.sh done?" -ForegroundColor Red; exit 1 }
 Write-Host "Sent the wake token to $($ip):$($cfg.wakePort)."

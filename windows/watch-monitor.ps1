@@ -95,6 +95,8 @@ while ($true) {
         }
         if ($moves.Count) {
             $target = Get-ScreenRole $moves[-1]
+            # The Mac is awake and connected: refresh its remembered address for waking it later.
+            if ($target -eq 'Mac') { [void](Get-MacIPv4) }
             if ($target) { $last = Sync-MonitorTo $target }
         }
     } catch { Log "deskflow log check failed: $($_.Exception.Message)" }

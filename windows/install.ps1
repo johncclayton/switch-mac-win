@@ -84,11 +84,14 @@ elseif ($newToken -or -not $old.wakeToken) {
 foreach ($h in @($cfg.serverHost, $cfg.clientHost)) {
     if (Test-IsIp $h) { Write-Warning "$h is an IP address: reserve it in your router's DHCP settings so it doesn't change." }
 }
-if (-not (Resolve-IPv4 $cfg.clientHost)) {
+$macIp = Resolve-IPv4 $cfg.clientHost
+if (-not $macIp) {
     Write-Warning "Can't resolve $($cfg.clientHost) to an IPv4 address right now. Waking the Mac needs it; check the name, or use the Mac's IP address."
 }
 
 Save-SmwConfig $cfg
+# Seed the fallback address used when the name doesn't resolve while the Mac sleeps.
+if ($macIp) { Set-Content (Join-Path (Split-Path $ConfigPath) 'mac-ipv4.txt') $macIp }
 Write-Host "Saved $ConfigPath"
 
 # --- Deskflow -----------------------------------------------------------------
