@@ -7,7 +7,8 @@ Import-Module (Join-Path $PSScriptRoot 'Deskflow.psm1') -Force
 
 $log = Join-Path $env:LOCALAPPDATA 'switch-mac-win\watch.log'
 New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
-function Log($msg) { "$(Get-Date -Format s) $msg" | Add-Content $log }
+# Logging must never kill the watcher (e.g. if something else has the file open).
+function Log($msg) { try { "$(Get-Date -Format s) $msg" | Add-Content $log -ErrorAction Stop } catch {} }
 
 function Get-ScreenState {
     if ((Get-Vcp 0xE9 -TimeoutSec 3).Value -ne 0) { return 'Split' }
