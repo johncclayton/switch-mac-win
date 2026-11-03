@@ -2,7 +2,7 @@
 #  - monitor -> Deskflow: polls the monitor; when it goes fullscreen DP/Thunderbolt
 #    (e.g. "Go Windows!" on the Mac, or the monitor's buttons) it moves the cursor.
 #  - Deskflow -> monitor: reads Deskflow's log; when the cursor changes machine
-#    (e.g. the Ctrl+Alt+Shift+F11/F12 hotkeys) it switches the monitor to match.
+#    (e.g. the Ctrl+Alt+Shift+F11 toggle hotkey) it switches the monitor to match.
 #    In split view the monitor is left alone, so the hotkeys just move the cursor.
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'DellDdc.psm1') -Force

@@ -18,8 +18,9 @@ keyboard/mouse to match. Windows (`obsidian`) is the Deskflow server and the Mac
   U4021QW codes: input `0x60` (DP = `0x0F`, TB = `0x19`), PBP mode `0xE9`
   (`0x00` off, `0x24` split), PBP second input `0xE8`.
 - **Deskflow:** `deskflow/deskflow-server.conf` has **no screen links**, so you
-  switch explicitly. Use the hotkeys **Ctrl+Alt+Shift+F11** (→ Mac) and **Ctrl+Alt+Shift+F12**
-  (→ Windows); the scripts press them for you.
+  switch explicitly. **Ctrl+Alt+Shift+F11** toggles between the two machines, on either
+  machine. The scripts and the watcher use explicit hotkeys instead: **Ctrl+Alt+Shift+F10** (→ Mac)
+  and **Ctrl+Alt+Shift+F12** (→ Windows).
 - **Watcher:** `windows/watch-monitor.ps1` runs at logon and keeps the monitor and Deskflow
   in step, whichever one moves first. It logs to `%LOCALAPPDATA%\switch-mac-win\watch.log`.
   - *Monitor → Deskflow:* it polls the monitor once a second. When the monitor goes fullscreen
@@ -52,4 +53,4 @@ Mac:
 
 This installs `m1ddc` and creates **Go Windows!** in `~/Desktop` and `~/Applications`
 (find it with Spotlight, or drag it to the Dock). From the Mac you can also just press
-**Ctrl+Alt+Shift+F12**: the keyboard is plugged into Windows, so the Deskflow hotkey works anywhere.
+**Ctrl+Alt+Shift+F11**: the keyboard is plugged into Windows, so the Deskflow hotkey works anywhere.

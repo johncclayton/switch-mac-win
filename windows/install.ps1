@@ -16,8 +16,15 @@ $new = $text -replace '(?m)^externalConfig=.*$', 'externalConfig=true' `
              -replace '(?m)^externalConfigFile=.*$', ('externalConfigFile=' + ($serverConf -replace '\\', '/'))
 if ($new -ne $text) {
     Copy-Item $guiConf "$guiConf.bak-$(Get-Date -Format yyyyMMdd-HHmmss)"
-    Set-Content $guiConf $new -NoNewline   # the Deskflow daemon notices and restarts the server
+    Set-Content $guiConf $new -NoNewline
     Write-Host "Deskflow now uses $serverConf"
+}
+# Deskflow only re-reads the server config when the app (re)starts the server.
+$gui = 'C:\Program Files\Deskflow\deskflow.exe'
+if (Get-Process deskflow -ErrorAction SilentlyContinue) {
+    Stop-Process -Name deskflow -Force; Start-Sleep 2
+    Start-Process $gui
+    Write-Host 'Restarted Deskflow to load the server config'
 }
 
 # --- Shortcuts ----------------------------------------------------------------
