@@ -92,8 +92,9 @@ while ($true) {
         if ($moves -contains 'wake-mac') {
             # F11 pressed while the Mac was asleep: wake it, then go there. The
             # resulting Deskflow switch is picked up next time round and moves the monitor.
-            Log 'F11 but the Mac is not connected; waking it over ssh'
-            if ((Resume-Mac) -and (Switch-DeskflowScreen Mac -WaitSec 3)) { Log 'Mac woke up' }
+            Log 'F11 but the Mac is not connected; waking it'
+            $how = Resume-Mac
+            if ($how -and (Switch-DeskflowScreen Mac -WaitSec 3)) { Log "Mac woke up (via $how)" }
             else { Log 'Mac did not wake up / reconnect; staying on Windows' }
             $moves = @()
         }

@@ -34,9 +34,14 @@ keyboard/mouse to match. Windows (`obsidian`) is the Deskflow server and the Mac
 
 ## When the Mac isn't there
 
-- **Asleep:** **Go Mac!** and **F11** wake it over `ssh m6 caffeinate -u` (a bare network
-  packet only half-wakes it, with Deskflow still disconnected), wait for Deskflow to reconnect,
-  then switch. It takes about 6 to 7 seconds.
+- **Asleep:** **Go Mac!** and **F11** wake it, wait for Deskflow to reconnect, then switch.
+  A bare network packet only half-wakes a Mac (a "dark wake", with Deskflow still disconnected),
+  so the Mac must also run `caffeinate -u`. They try two ways, in order:
+  1. **Wake listener** *(experimental, no SSH)*: `mac/wake-listener.plist` is a LaunchAgent in
+     which launchd listens on TCP port **47999**, advertised over Bonjour so a connection wakes the
+     Mac, and runs `caffeinate -u` for each connection. Windows just connects to it. In testing
+     this woke a sleeping Mac in about 2 seconds. It has no authentication or rate limiting yet.
+  2. **SSH:** `ssh m6 caffeinate -u`, taking about 6 to 7 seconds in total.
 - **Off, or Deskflow not running:** Go Mac! moves Deskflow first and only switches the
   monitor once Deskflow confirms the move, so it shows a warning and stays on Windows. F11 does nothing.
 - If the Mac drops out while you're on it, Deskflow jumps the cursor back to Windows and the
@@ -66,7 +71,7 @@ Everything below must be in place; the install scripts only cover the parts mark
 - The Mac is a **client** connecting to `obsidian`, with Deskflow set to start at login and
   granted **Accessibility** permission (System Settings → Privacy & Security).
 
-**SSH from Windows to the Mac** (to wake it, and as a fallback for switching the monitor)
+**SSH from Windows to the Mac** (a fallback for waking it and for switching the monitor; the wake listener may make it optional)
 - On the Mac: **Remote Login** on (System Settings → General → Sharing).
 - On Windows: the built-in OpenSSH client, and a host alias `m6` in `~/.ssh/config` that logs
   in **with a key and no password prompt**. The scripts use `ssh -o BatchMode=yes m6`. Example:
@@ -110,6 +115,6 @@ Clone the repo to `~/src/switch-mac-win` (the watcher's SSH fallback expects it 
 ./mac/install.sh
 ```
 
-This installs `m1ddc` and creates **Go Windows!** in `~/Desktop` and `~/Applications`
+This installs `m1ddc` and the wake listener (port 47999), and creates **Go Windows!** in `~/Desktop` and `~/Applications`
 (find it with Spotlight, or drag it to the Dock). From the Mac you can also just press
 **Ctrl+Alt+Shift+F11**: the keyboard is plugged into Windows, so the Deskflow hotkey works anywhere.
