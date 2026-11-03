@@ -34,9 +34,11 @@ keyboard/mouse to match. Windows (`obsidian`) is the Deskflow server and the Mac
 
 ## When the Mac isn't there
 
-- **Go Mac!** moves Deskflow first and only switches the monitor once Deskflow confirms the
-  move. If the Mac is off, asleep, or not running Deskflow, it shows a warning and stays on Windows.
-- **F11/F10** do nothing when the Mac isn't connected, so the monitor stays put.
+- **Asleep:** **Go Mac!** and **F11** wake it over `ssh m6 caffeinate -u` (a bare network
+  packet only half-wakes it, with Deskflow still disconnected), wait for Deskflow to reconnect,
+  then switch. It takes about 6 to 7 seconds.
+- **Off, or Deskflow not running:** Go Mac! moves Deskflow first and only switches the
+  monitor once Deskflow confirms the move, so it shows a warning and stays on Windows. F11 does nothing.
 - If the Mac drops out while you're on it, Deskflow jumps the cursor back to Windows and the
   watcher switches the monitor back.
 

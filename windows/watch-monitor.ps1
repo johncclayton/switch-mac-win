@@ -24,7 +24,8 @@ function Get-ScreenState {
     switch ((Get-Vcp 0x60 -TimeoutSec 3).Value) { 0x19 { 'Mac' } 0x0F { 'Windows' } default { 'Other' } }
 }
 
-# Returns the machines Deskflow switched to since the last call, in order.
+# Returns the machines Deskflow switched to since the last call, in order, plus
+# 'wake-mac' when the F11 toggle failed because the Mac wasn't connected.
 $logPos = try { (Get-Item $deskflowLog).Length } catch { 0 }
 function Read-DeskflowSwitches {
     $fs = [IO.File]::Open($deskflowLog, 'Open', 'Read', 'ReadWrite,Delete')
@@ -35,8 +36,9 @@ function Read-DeskflowSwitches {
         $text = (New-Object IO.StreamReader($fs)).ReadToEnd()
         $script:logPos = $fs.Length
     } finally { $fs.Close() }
-    foreach ($m in [regex]::Matches($text, '(?:switch|jump) from "([^"]+)" to "([^"]+)"')) {
-        if ($m.Groups[1].Value -ne $m.Groups[2].Value) { $m.Groups[2].Value }
+    foreach ($m in [regex]::Matches($text, '(?:switch|jump) from "([^"]+)" to "([^"]+)"|not enough computers to toggle')) {
+        if (-not $m.Groups[1].Success) { 'wake-mac' }
+        elseif ($m.Groups[1].Value -ne $m.Groups[2].Value) { $m.Groups[2].Value }
     }
 }
 
@@ -87,6 +89,14 @@ while ($true) {
 
     try {
         $moves = @(Read-DeskflowSwitches)
+        if ($moves -contains 'wake-mac') {
+            # F11 pressed while the Mac was asleep: wake it, then go there. The
+            # resulting Deskflow switch is picked up next time round and moves the monitor.
+            Log 'F11 but the Mac is not connected; waking it over ssh'
+            if ((Resume-Mac) -and (Switch-DeskflowScreen Mac -WaitSec 3)) { Log 'Mac woke up' }
+            else { Log 'Mac did not wake up / reconnect; staying on Windows' }
+            $moves = @()
+        }
         if ($moves.Count) {
             $target = $screenOf[$moves[-1]]
             if ($target) { $last = Sync-MonitorTo $target }
