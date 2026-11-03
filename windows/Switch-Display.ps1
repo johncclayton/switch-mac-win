@@ -3,7 +3,8 @@
 param(
     [Parameter(Mandatory)][ValidateSet('Mac', 'Windows', 'Split')][string]$Target,
     [switch]$NoDeskflow,
-    [int]$TimeoutSec = 15   # how long to keep retrying DDC while the monitor re-enumerates
+    [int]$TimeoutSec = 15,    # how long to keep retrying DDC while the monitor re-enumerates
+    [int]$WaitForMacSec = 45  # Mac: how long to wait for its Deskflow once it's shown in split view
 )
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'DellDdc.psm1')
@@ -19,6 +20,13 @@ $VCP_PBP_MODE = 0xE9    # Dell: 0x00 off, 0x24 50/50 split
 $PBP_OFF = 0x00
 $PBP_SPLIT = 0x24
 
+function Set-Split {
+    Set-Vcp $VCP_PBP_MODE $PBP_SPLIT
+    Start-Sleep -Milliseconds 1500
+    Set-Vcp $VCP_INPUT $INPUT_DP
+    Set-Vcp $VCP_PBP_INPUT $INPUT_TB
+}
+
 function Set-Fullscreen([int]$InputCode) {
     if ((Get-Vcp $VCP_PBP_MODE).Value -ne $PBP_OFF) {
         Set-Vcp $VCP_PBP_MODE $PBP_OFF
@@ -30,13 +38,24 @@ function Set-Fullscreen([int]$InputCode) {
 switch ($Target) {
     'Mac' {
         # Move the keyboard/mouse first. If the Mac isn't connected to Deskflow (e.g.
-        # asleep), wake it and try again; if that fails too, leave the monitor
-        # on Windows rather than switching to a blank screen.
-        if (-not $NoDeskflow -and -not (Switch-DeskflowScreen Mac -WaitSec 2) -and
-            -not ((Resume-Mac) -and (Switch-DeskflowScreen Mac -WaitSec 3))) {
-            $msg = "Couldn't reach the Mac: it didn't wake up, or Deskflow or the wake listener isn't running on it. Staying on Windows."
-            (New-Object -ComObject WScript.Shell).Popup($msg, 8, 'Go Mac!', 0x30) | Out-Null
-            exit 1
+        # asleep), wake it and try again. If it still isn't, show the Mac in split view
+        # and wait for its Deskflow: a Mac with no display can't start Deskflow, and
+        # after a restart it's waiting for a password (docs/adr/0003). The monitor only
+        # goes fullscreen Mac once Deskflow has the cursor there.
+        if (-not $NoDeskflow -and -not (Switch-DeskflowScreen Mac -WaitSec 2)) {
+            Write-Host 'The Mac is not connected to Deskflow; waking it'
+            if (-not ((Resume-Mac) -and (Switch-DeskflowScreen Mac -WaitSec 3))) {
+                Write-Host "$(Get-LastWakeStatus); showing the Mac in split view and waiting for its Deskflow"
+                $since = Get-DeskflowLogLength
+                Set-Split
+                if (-not ((Wait-MacConnected $since $WaitForMacSec) -and (Switch-DeskflowScreen Mac -WaitSec 3))) {
+                    Write-Host "The Mac's Deskflow didn't connect within $WaitForMacSec s; staying in split view"
+                    $msg = "The Mac's Deskflow hasn't connected. It's on the right half of the screen: log in to it if it asks, and once it's up press Go Mac! again."
+                    (New-Object -ComObject WScript.Shell).Popup($msg, 10, 'Go Mac!', 0x30) | Out-Null
+                    exit 1
+                }
+                Write-Host "The Mac's Deskflow connected"
+            }
         }
         Set-Fullscreen $INPUT_TB
     }
@@ -44,10 +63,5 @@ switch ($Target) {
         Set-Fullscreen $INPUT_DP
         if (-not $NoDeskflow) { Switch-DeskflowScreen Windows }
     }
-    'Split' {
-        Set-Vcp $VCP_PBP_MODE $PBP_SPLIT
-        Start-Sleep -Milliseconds 1500
-        Set-Vcp $VCP_INPUT $INPUT_DP
-        Set-Vcp $VCP_PBP_INPUT $INPUT_TB
-    }
+    'Split' { Set-Split }
 }

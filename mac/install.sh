@@ -7,8 +7,8 @@
 #  - saves ~/Library/Application Support/switch-mac-win/config
 #  - writes Deskflow's settings: this Mac's name and the Windows PC to connect to
 #    (backs up Deskflow.conf first; see docs/adr/0002)
-#  - installs m1ddc, the "Go Windows!" app (Desktop and ~/Applications), and the
-#    wake listener (a LaunchAgent)
+#  - installs m1ddc, the "Go Windows!" app (Desktop and ~/Applications), the
+#    wake listener and the Deskflow keeper (both LaunchAgents)
 #  - prints the command to run on the Windows PC
 #
 # Options (all optional except --client):
@@ -136,7 +136,7 @@ open -a Deskflow && echo "Started Deskflow"
 
 # --- Tools and the Go Windows! app --------------------------------------------
 command -v m1ddc >/dev/null || /opt/homebrew/bin/brew install m1ddc
-chmod +x "$here/switch-to-windows.sh" "$here/wake.sh"
+chmod +x "$here/switch-to-windows.sh" "$here/wake.sh" "$here/keep-deskflow.sh"
 mkdir -p "$HOME/Applications"
 for app in "$HOME/Desktop/Go Windows!.app" "$HOME/Applications/Go Windows!.app"; do
     rm -rf "$app"
@@ -144,14 +144,21 @@ for app in "$HOME/Desktop/Go Windows!.app" "$HOME/Applications/Go Windows!.app";
     echo "Created $app"
 done
 
-# --- Wake listener ------------------------------------------------------------
-agent="$HOME/Library/LaunchAgents/com.switch-mac-win.wake.plist"
+# --- Wake listener and Deskflow keeper (LaunchAgents) ---------------------------
 mkdir -p "$HOME/Library/LaunchAgents"
-launchctl bootout "gui/$(id -u)" "$agent" 2>/dev/null || true
-sed -e "s|{{WAKE_SCRIPT}}|$here/wake.sh|" -e "s|{{WAKE_PORT}}|$WAKE_PORT|" \
-    "$here/wake-listener.plist.template" > "$agent"
-launchctl bootstrap "gui/$(id -u)" "$agent"
-echo "Wake listener on port $WAKE_PORT ($agent)"
+# install_agent PLIST TEMPLATE SED-EXPRESSIONS...
+install_agent() {
+    local agent="$HOME/Library/LaunchAgents/$1" template=$2; shift 2
+    launchctl bootout "gui/$(id -u)" "$agent" 2>/dev/null || true
+    sed "$@" "$here/$template" > "$agent"
+    launchctl bootstrap "gui/$(id -u)" "$agent"
+}
+install_agent com.switch-mac-win.wake.plist wake-listener.plist.template \
+    -e "s|{{WAKE_SCRIPT}}|$here/wake.sh|" -e "s|{{WAKE_PORT}}|$WAKE_PORT|"
+echo "Wake listener on port $WAKE_PORT (~/Library/LaunchAgents/com.switch-mac-win.wake.plist)"
+install_agent com.switch-mac-win.deskflow.plist keep-deskflow.plist.template \
+    -e "s|{{KEEP_SCRIPT}}|$here/keep-deskflow.sh|"
+echo "Deskflow keeper installed (~/Library/LaunchAgents/com.switch-mac-win.deskflow.plist)"
 
 # --- The Windows PC -----------------------------------------------------------
 echo

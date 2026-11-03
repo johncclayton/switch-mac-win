@@ -4,7 +4,9 @@
 #  - Deskflow -> monitor: reads Deskflow's log; when the cursor changes machine
 #    (e.g. the toggle hotkey) it switches the monitor to match. In split view the
 #    monitor is left alone, so the hotkeys just move the cursor.
-#  - toggle hotkey while the Mac sleeps: wakes the Mac, then moves there.
+#  - toggle hotkey while the Mac isn't connected: wakes the Mac, then moves there. If
+#    it still doesn't connect, shows it in split view and waits for its Deskflow
+#    (Switch-Display.ps1 -Target Mac, docs/adr/0003).
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'DellDdc.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'Deskflow.psm1') -Force
@@ -86,12 +88,16 @@ while ($true) {
     try {
         $moves = @(Read-DeskflowSwitches)
         if ($moves -contains 'wake-mac') {
-            # Toggle pressed while the Mac was asleep: wake it, then go there. The
-            # resulting Deskflow switch is picked up next time round and moves the monitor.
-            Log 'toggle hotkey but the Mac is not connected; waking it'
-            if ((Resume-Mac) -and (Switch-DeskflowScreen Mac -WaitSec 3)) { Log 'Mac woke up' }
-            else { Log 'Mac did not wake up / reconnect; staying on Windows' }
+            # Toggle pressed while the Mac isn't connected: Go Mac! wakes it, or shows it in
+            # split view and waits for its Deskflow, then switches the monitor. This can take
+            # about a minute, during which the watcher does nothing else. Toggle presses made
+            # meanwhile are dropped afterwards so they don't start it all over again.
+            Log 'toggle hotkey but the Mac is not connected; running Go Mac!'
+            & $switchDisplay -Target Mac -TimeoutSec 4 *>&1 | ForEach-Object { Log "  go mac: $_" }
+            Log "  go mac: $(if ($LASTEXITCODE) { 'gave up' } else { 'done' })"
+            [void](Read-DeskflowSwitches)
             $moves = @()
+            $last = $null   # whatever the monitor shows now is the new baseline
         }
         if ($moves.Count) {
             $target = Get-ScreenRole $moves[-1]

@@ -30,3 +30,13 @@ The service on the Mac that wakes it fully when the Windows PC connects to it.
 **Wake token**:
 The shared secret the Windows PC sends to the wake listener to prove the request is genuine.
 _Avoid_: password, key
+
+## Keeping Deskflow up
+
+**Keeper**:
+The service on the Mac that starts Deskflow when it isn't running, or restarts it once the Mac has a display again.
+_Avoid_: watchdog, monitor (the watcher on the Windows PC is a different thing)
+
+**Split view**:
+The monitor showing the Windows PC on the left and the Mac on the right (the Dell's PBP mode). Also the fallback when the Mac can't be reached.
+_Avoid_: PBP, PIP

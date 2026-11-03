@@ -90,15 +90,24 @@ function Send-MacWake([int]$TimeoutMs = 3000) {
 function Resume-Mac([int]$WaitSec = 15) {
     $start = Get-DeskflowLogLength
     $deadline = (Get-Date).AddSeconds($WaitSec)
+    $script:LastWakeStatus = "the wake listener didn't answer"
     do {
         # The first connection may only wake the Mac; retry so one lands once it's up.
-        [void](Send-MacWake)
-        if (Wait-DeskflowLog 'accepted client connection' $start 2) {
-            Start-Sleep -Milliseconds 500   # let the handshake finish
-            return $true
-        }
+        if (Send-MacWake) { $script:LastWakeStatus = "the wake listener answered but Deskflow didn't connect" }
+        if (Wait-MacConnected $start 2) { return $true }
     } while ((Get-Date) -lt $deadline)
     $false
 }
 
-Export-ModuleMember -Function Switch-DeskflowScreen, Resume-Mac, Get-ScreenRole, Send-MacWake, Get-MacIPv4
+# Why the last Resume-Mac failed, for log messages.
+function Get-LastWakeStatus { $script:LastWakeStatus }
+
+# Waits for the Mac's Deskflow client to connect (it logs "accepted client connection"
+# on the server), e.g. after the Mac logs in or its Deskflow restarts.
+function Wait-MacConnected([long]$Since, [int]$WaitSec) {
+    if (-not (Wait-DeskflowLog 'accepted client connection' $Since $WaitSec)) { return $false }
+    Start-Sleep -Milliseconds 500   # let the handshake finish
+    $true
+}
+
+Export-ModuleMember -Function Switch-DeskflowScreen, Resume-Mac, Get-LastWakeStatus, Wait-MacConnected, Get-DeskflowLogLength, Get-ScreenRole, Send-MacWake, Get-MacIPv4

@@ -25,4 +25,6 @@ if [ $((now - last)) -lt 2 ]; then say "ignored: less than 2 s since the last wa
 echo "$now" > "$stamp"
 
 say "waking"
+# Also give the keeper a nudge, so Deskflow starts now if it isn't running.
+launchctl kickstart "gui/$(id -u)/com.switch-mac-win.deskflow" 2>/dev/null || true
 exec /usr/bin/caffeinate -u -t 2

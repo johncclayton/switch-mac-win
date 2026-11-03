@@ -65,7 +65,8 @@ settings.
   **Go Split!** desktop shortcuts; and the watcher, started now and from the Startup folder.
 - **Mac:** `~/Library/Application Support/switch-mac-win/config`; Deskflow's settings
   (`~/Library/Deskflow/Deskflow.conf`, backed up first); `m1ddc`; the **Go Windows!** app; and
-  the wake listener `~/Library/LaunchAgents/com.switch-mac-win.wake.plist`.
+  two LaunchAgents, the wake listener `~/Library/LaunchAgents/com.switch-mac-win.wake.plist`
+  and the Deskflow keeper `~/Library/LaunchAgents/com.switch-mac-win.deskflow.plist`.
 
 The config is the source of truth: the installers overwrite the screen names and the server
 address in Deskflow's settings ([ADR 0002](docs/adr/0002-our-config-overwrites-deskflow-settings.md)).
@@ -111,14 +112,26 @@ and restore Deskflow's settings from the `Deskflow.conf.bak-*` backups if you wa
   fully wakes the Mac. It allows at most one wake every 2 seconds and logs to
   `~/Library/Logs/switch-mac-win-wake.log`.
   There's no SSH anywhere ([ADR 0001](docs/adr/0001-no-ssh-wake-via-launchd.md)).
+- **Keeper:** a second LaunchAgent on the Mac runs `mac/keep-deskflow.sh` every 15 s. It starts
+  Deskflow if it isn't running, and restarts it when its client has stopped and a display is
+  attached (a Mac with no display can't start a Deskflow client). It logs to
+  `~/Library/Logs/switch-mac-win-keeper.log`. To stop Deskflow on the Mac for good, unload
+  the keeper first ([ADR 0003](docs/adr/0003-split-view-when-the-mac-cant-be-reached.md)).
 
 ## When the Mac isn't there
 
-- **Asleep:** **Go Mac!** and the toggle hotkey wake it through the wake listener, wait for
-  Deskflow to reconnect (about 2 s), then switch.
-- **Off, or Deskflow or the wake listener not running:** Go Mac! moves Deskflow first and only
-  switches the monitor once Deskflow confirms the move, so it shows a warning and stays on
-  Windows. The toggle hotkey does nothing.
+Go Mac! and the toggle hotkey move Deskflow first and only switch the monitor once Deskflow
+confirms the move, so the monitor never shows a Mac that can't take the keyboard.
+
+- **Asleep:** they wake it through the wake listener, wait for Deskflow to reconnect (about
+  2 s), then switch.
+- **Deskflow not running on the Mac, or the Mac just restarted:** the wake doesn't help, so
+  they show the Mac in **split view** (Windows left, Mac right) and wait up to 45 s for its
+  Deskflow. The keeper starts Deskflow as soon as the Mac has a display; a restarted Mac first
+  needs its FileVault password typed on a keyboard of its own. Once Deskflow connects, the
+  switch finishes; otherwise the monitor stays in split view and Go Mac! says so.
+- **Off:** same as above, but nothing connects: the monitor stays in split view with a blank
+  right half. Go Windows! brings it back.
 - **The Mac drops out while you're on it:** Deskflow jumps the cursor back to the Windows PC,
   and the watcher switches the monitor back.
 - **The Windows PC can't control the monitor while the Mac is on screen:** there's no
