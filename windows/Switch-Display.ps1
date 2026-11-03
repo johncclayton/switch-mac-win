@@ -29,8 +29,15 @@ function Set-Fullscreen([int]$InputCode) {
 
 switch ($Target) {
     'Mac' {
+        # Move the keyboard/mouse first: if the Mac isn't there (off, asleep, Deskflow
+        # not running) Deskflow won't move, and we leave the monitor on Windows rather
+        # than switching to a blank screen.
+        if (-not $NoDeskflow -and -not (Switch-DeskflowScreen Mac -WaitSec 3)) {
+            $msg = 'The Mac is not connected to Deskflow (off, asleep, or Deskflow not running). Staying on Windows.'
+            (New-Object -ComObject WScript.Shell).Popup($msg, 8, 'Go Mac!', 0x30) | Out-Null
+            exit 1
+        }
         Set-Fullscreen $INPUT_TB
-        if (-not $NoDeskflow) { Switch-DeskflowScreen Mac }
     }
     'Windows' {
         Set-Fullscreen $INPUT_DP

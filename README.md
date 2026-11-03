@@ -32,6 +32,14 @@ keyboard/mouse to match. Windows (`obsidian`) is the Deskflow server and the Mac
     so the hotkeys just move the cursor. If Windows can't reach the monitor over DDC, it asks
     the Mac over `ssh m6` to run `mac/switch-to-windows.sh`.
 
+## When the Mac isn't there
+
+- **Go Mac!** moves Deskflow first and only switches the monitor once Deskflow confirms the
+  move. If the Mac is off, asleep, or not running Deskflow, it shows a warning and stays on Windows.
+- **F11/F10** do nothing when the Mac isn't connected, so the monitor stays put.
+- If the Mac drops out while you're on it, Deskflow jumps the cursor back to Windows and the
+  watcher switches the monitor back.
+
 ## Setup
 
 Windows:

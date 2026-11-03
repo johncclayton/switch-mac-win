@@ -78,7 +78,7 @@ while ($true) {
     if ($null -ne $last -and $state -ne $last) {
         if ($state -in 'Mac', 'Windows') {
             Log "screen changed $last -> $state; switching Deskflow"
-            Switch-DeskflowScreen $state
+            Switch-DeskflowScreen $state | Out-Null
         } else {
             Log "screen changed $last -> $state"
         }
