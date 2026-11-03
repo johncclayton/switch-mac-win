@@ -20,10 +20,16 @@ keyboard/mouse to match. Windows (`obsidian`) is the Deskflow server and the Mac
 - **Deskflow:** `deskflow/deskflow-server.conf` has **no screen links**, so you
   switch explicitly. Use the hotkeys **Ctrl+Alt+Shift+F11** (→ Mac) and **Ctrl+Alt+Shift+F12**
   (→ Windows); the scripts press them for you.
-- **Mac → Windows:** the Mac can't send commands to the Deskflow server, so
-  `windows/watch-monitor.ps1` runs at logon. It polls the monitor once a second, and when the
-  input becomes fullscreen DP it moves Deskflow to Windows. It works the same way if you
-  switch inputs with the monitor's buttons. It logs to `%LOCALAPPDATA%\switch-mac-win\watch.log`.
+- **Watcher:** `windows/watch-monitor.ps1` runs at logon and keeps the monitor and Deskflow
+  in step, whichever one moves first. It logs to `%LOCALAPPDATA%\switch-mac-win\watch.log`.
+  - *Monitor → Deskflow:* it polls the monitor once a second. When the monitor goes fullscreen
+    on one input, it moves Deskflow to that machine. That is how the Mac's **Go Windows!**
+    brings the keyboard and mouse back, since the Mac can't command the Deskflow server.
+    It also works if you switch inputs with the monitor's buttons.
+  - *Deskflow → monitor:* it reads Deskflow's log, and when the cursor changes machine (e.g. via
+    the hotkeys) it switches the monitor to match. In split view it leaves the monitor alone,
+    so the hotkeys just move the cursor. If Windows can't reach the monitor over DDC, it asks
+    the Mac over `ssh m6` to run `mac/switch-to-windows.sh`.
 
 ## Setup
 

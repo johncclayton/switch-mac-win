@@ -2,11 +2,13 @@
 # and the side-by-side PBP split, and moves the Deskflow cursor to match.
 param(
     [Parameter(Mandatory)][ValidateSet('Mac', 'Windows', 'Split')][string]$Target,
-    [switch]$NoDeskflow
+    [switch]$NoDeskflow,
+    [int]$TimeoutSec = 15   # how long to keep retrying DDC while the monitor re-enumerates
 )
 $ErrorActionPreference = 'Stop'
-Import-Module (Join-Path $PSScriptRoot 'DellDdc.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'Deskflow.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'DellDdc.psm1')
+Import-Module (Join-Path $PSScriptRoot 'Deskflow.psm1')
+$PSDefaultParameterValues = @{ 'Get-Vcp:TimeoutSec' = $TimeoutSec; 'Set-Vcp:TimeoutSec' = $TimeoutSec }
 
 # U4021QW VCP values (from its DDC capabilities string)
 $INPUT_DP = 0x0F   # Windows
