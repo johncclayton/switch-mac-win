@@ -17,5 +17,7 @@
     <true/>
     <key>StartInterval</key>
     <integer>15</integer>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/Library/Logs/switch-mac-win-keeper.log</string>
 </dict>
 </plist>

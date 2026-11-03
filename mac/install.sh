@@ -157,7 +157,7 @@ install_agent com.switch-mac-win.wake.plist wake-listener.plist.template \
     -e "s|{{WAKE_SCRIPT}}|$here/wake.sh|" -e "s|{{WAKE_PORT}}|$WAKE_PORT|"
 echo "Wake listener on port $WAKE_PORT (~/Library/LaunchAgents/com.switch-mac-win.wake.plist)"
 install_agent com.switch-mac-win.deskflow.plist keep-deskflow.plist.template \
-    -e "s|{{KEEP_SCRIPT}}|$here/keep-deskflow.sh|"
+    -e "s|{{KEEP_SCRIPT}}|$here/keep-deskflow.sh|" -e "s|{{HOME}}|$HOME|"
 echo "Deskflow keeper installed (~/Library/LaunchAgents/com.switch-mac-win.deskflow.plist)"
 
 # --- The Windows PC -----------------------------------------------------------
