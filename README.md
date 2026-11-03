@@ -50,4 +50,6 @@ Mac:
 ./mac/install.sh
 ```
 
-This installs `m1ddc` and creates `~/Desktop/Go Windows!.app`.
+This installs `m1ddc` and creates **Go Windows!** in `~/Desktop` and `~/Applications`
+(find it with Spotlight, or drag it to the Dock). From the Mac you can also just press
+**Ctrl+Alt+Shift+F12**: the keyboard is plugged into Windows, so the Deskflow hotkey works anywhere.
